@@ -105,7 +105,8 @@ strands-agentcore-arize-cookbook/
                            #   spans_sample.md (committed); spans.parquet/csv (gitignored)
   notebooks/               # better_together_cookbook.ipynb (narrative walkthrough)
   DESIGN_MEMO.md           # Step 7: partner choice + production-readiness plan
-  requirements.txt         # laptop-side deps
+  Dockerfile               # optional container image (TRACK A); offline smoke test by default
+  requirements.txt         # laptop-side deps (pinned)
   .env.example
 ```
 
@@ -245,6 +246,19 @@ The loop uses the `phoenix.client` SDK (the programmatic equivalent of the PX
 CLI) to pull spans, log annotations, and create the dataset; the PX CLI / Phoenix
 skills are an interchangeable surface for the same operations in a dev workflow.
 
+**Scheduling (the "job definition / workflow" the brief asks for).** The loop is
+a single idempotent entrypoint, so scheduling it is a one-liner. As cron:
+
+```
+*/30 * * * * cd /app && python -m src.feedback_loop >> feedback.log 2>&1
+```
+
+The same `python -m src.feedback_loop` step drops into a GitHub Actions scheduled
+workflow, an Airflow DAG (or the Arize AX Airflow Provider), or a Kubernetes
+CronJob, and opens a PR when a flag trips. In production you'd run it over the
+tail-sampled trace set (see `DESIGN_MEMO.md` §3.2-3.3) and gate merges on the
+eval thresholds.
+
 ### Step 7: production-readiness memo
 
 See `DESIGN_MEMO.md` (partner choice, better-together rationale, collector
@@ -262,6 +276,18 @@ python docs/architecture.py        # writes docs/architecture.png
 ```bash
 cd agentcore && python deploy.py
 ```
+
+### Container image (optional)
+
+```bash
+docker build -t partner-sa-assessment .
+docker run --rm partner-sa-assessment        # zero-config offline KB smoke test
+```
+
+The root `Dockerfile` packages TRACK A (agent + harness + evals + feedback loop).
+`docker run` defaults to the offline mock-KB smoke test (no AWS/Phoenix); pass AWS
+creds + `PHOENIX_ENDPOINT` and override the command to run the full harness or
+feedback loop (examples are in the Dockerfile header).
 
 ---
 
