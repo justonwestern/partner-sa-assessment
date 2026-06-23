@@ -3,8 +3,7 @@ llm_judge.py
 ============
 
 Step 5: three evals plus a custom LLM-as-judge with explicit rubric and
-hand-label validation. This module PORTS the donor evals.py judge pattern
-(arize-partner-rag-demo): a judge that returns a LABEL plus a one-sentence
+hand-label validation. The judge returns a LABEL plus a one-sentence
 English EXPLANATION (the "English error term" the feedback loop consumes).
 
 Evals implemented here:
@@ -23,7 +22,7 @@ Validation: run_validation() scores a small hand-labeled set (see
 eval_labeled_set.json) with the rubric judge and prints an agreement report:
 accuracy, precision, recall, F1, and Cohen's kappa between judge and humans.
 
-Judge backend: OpenAI (gpt-4o-mini), same as the donor. Reads OPENAI_API_KEY.
+Judge backend: OpenAI (gpt-4o-mini). Reads OPENAI_API_KEY.
 For an offline dry run (no API key), pass judge_fn=stub_judge to the eval funcs;
 run_validation(offline=True) uses a deterministic keyword stub so the agreement
 math is demonstrable without network.
@@ -108,7 +107,7 @@ Line 2: one sentence naming which rubric criterion drove the verdict.
 # Judge backends
 # --------------------------------------------------------------------------- #
 def _parse_two_line(text: str) -> Tuple[str, str]:
-    """Parse the donor's two-line judge format into (label, explanation)."""
+    """Parse the two-line judge format into (label, explanation)."""
     lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
     first = lines[0].lower() if lines else (text or "").lower()
     match = re.match(r"[a-z_]+", first)
@@ -118,7 +117,7 @@ def _parse_two_line(text: str) -> Tuple[str, str]:
 
 
 def openai_judge(prompt: str, model: str = "gpt-4o-mini") -> Tuple[str, str]:
-    """Call OpenAI and parse the two-line label+explanation. Ported from donor."""
+    """Call OpenAI and parse the two-line label+explanation."""
     from openai import OpenAI
 
     client = OpenAI()
@@ -207,7 +206,7 @@ def eval_rubric_quality(query: str, answer: str, judge_fn: JudgeFn) -> Tuple[str
 
 
 # --------------------------------------------------------------------------- #
-# Hand-label validation + agreement metrics (Step 5c)
+# Hand-label validation + agreement metrics
 # --------------------------------------------------------------------------- #
 def _binary(label: str, positive: str) -> int:
     return 1 if label.strip().lower() == positive else 0

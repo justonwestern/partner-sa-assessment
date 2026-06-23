@@ -2,11 +2,10 @@
 code_evaluator.py
 =================
 
-A code-based evaluator stub -- the same KIND of artifact Alyx drafts for you in
-Arize AX when you ask it to "turn this failure mode into an eval." Having a
-hand-written one in the repo lets you do a powerful side-by-side in the
-interview: "here's the evaluator I wrote, here's the one Alyx generated from my
-traces, here's how they compare."
+A code-based evaluator -- the same KIND of artifact Alyx drafts for you in
+Arize AX when you ask it to "turn this failure mode into an eval." Keeping a
+hand-written one alongside it makes the comparison concrete: the evaluator you
+wrote versus one generated from your traces, and where they agree or differ.
 
 This evaluator scores whether the Partner Solutions Assistant's answer is
 GROUNDED: did it actually cite a doc snippet, and did it stay within the length

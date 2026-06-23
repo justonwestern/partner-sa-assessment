@@ -4,9 +4,8 @@ tools.py
 
 Strands tools for the Partner Solutions Assistant.
 
-The headline tool here is `search_partner_docs`, which is a REAL Bedrock
-Knowledge Base retrieval (the partner-native primitive), replacing the mocked
-dict that lived here in the skeleton. It satisfies Step 2 of the assessment:
+The headline tool here is `search_partner_docs`, a REAL Bedrock Knowledge Base
+retrieval (the partner-native primitive). It is the agent's retrieval surface:
 
   (a) it integrates and is only invoked when the agent decides retrieval is
       relevant (Strands tool-calling decides this from the docstring);
@@ -21,9 +20,9 @@ dict that lived here in the skeleton. It satisfies Step 2 of the assessment:
       span status ERROR by the caller in local_agent.py.
 
 MOCK_KB fallback: set MOCK_KB=true in .env to return canned docs read from the
-local docs/ folder (the same partner-overview markdown the donor RAG demo used).
-This lets the candidate demo the full trace + eval + feedback loop even if KB
-provisioning stalls. Real Bedrock KB is the DEFAULT (MOCK_KB unset or false).
+local docs/ folder (the partner-overview markdown). This lets you run the full
+trace + eval + feedback loop even if KB provisioning stalls. Real Bedrock KB is
+the DEFAULT (MOCK_KB unset or false).
 
 Run a quick offline smoke test (uses MOCK_KB so it needs no AWS):
     MOCK_KB=true python -m src.tools
@@ -79,8 +78,8 @@ class RetrievalResult(BaseModel):
 
         We still hand the agent a string (that is what an LLM consumes), but the
         STRUCTURED object is what the tool returns to the framework and what the
-        span records. The agent-facing text mirrors the donor citation format
-        `[source] text` so existing eval prompts keep working.
+        span records. The agent-facing text uses a `[source] text` citation
+        format so the eval prompts can check for grounding.
         """
         if self.is_error:
             return f"RETRIEVAL_ERROR: {self.error}"

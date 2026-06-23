@@ -4,8 +4,8 @@ feedback_loop.py
 
 Step 6: a lightweight, repeatable automated feedback loop.
 
-This adapts the donor prompt_learning.py idea (English-critique -> instruction
-patch) into an operational loop you can run on a schedule:
+This implements a prompt-learning idea (English-critique -> instruction
+patch) as an operational loop you can run on a schedule:
 
   1. PULL recent traces from local Phoenix (or fall back to the harness's
      experiments/query_records.json when Phoenix is not reachable).
@@ -16,10 +16,10 @@ patch) into an operational loop you can run on a schedule:
      drafts an improved system-prompt instruction and shows where a PR would be
      opened (the human-in-the-loop approval gate from Prompt Learning).
 
-This is intentionally NOT a fully autonomous prompt rewriter. The donor demo
-proved the loop can edit a fenced <INSTRUCTIONS> block from an English critique;
-here we keep the human approval gate explicit, which is the responsible-AI story
-for the panel.
+This is intentionally NOT a fully autonomous prompt rewriter. The loop can
+edit a fenced <INSTRUCTIONS> block from an English critique; here we keep the
+human approval gate explicit, which is the responsible-AI posture for a
+partner-facing quality loop.
 
 Run (offline stub judge, uses harness records if present):
     python -m src.feedback_loop --offline
@@ -212,8 +212,8 @@ def _detect_patterns(results: List[Dict]) -> Dict:
 def _draft_prompt_patch(patterns: Dict) -> str:
     """STUB: turn the dominant failure theme into ONE proposed instruction.
 
-    This mirrors the donor meta-prompt step but stays a stub: it proposes the
-    English instruction and where the PR would go, leaving the human to approve.
+    This is the meta-prompt step, kept as a stub: it proposes the English
+    instruction and where the PR would go, leaving the human to approve.
     """
     theme = patterns["theme"]
     if not theme:

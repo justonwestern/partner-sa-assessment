@@ -5,7 +5,7 @@ instrumentation.py
 OpenTelemetry -> OpenInference wiring for the LOCAL track, targeting LOCAL
 PHOENIX by default (Step 3).
 
-The assessment mandates capturing traces in local Phoenix (phoenix serve,
+This build captures traces in local Phoenix (phoenix serve,
 http://localhost:6006). So this module registers a TracerProvider that:
 
   * routes Strands' native OpenTelemetry spans through the OpenInference
@@ -16,10 +16,10 @@ http://localhost:6006). So this module registers a TracerProvider that:
 Arize AX (otlp.arize.com) is kept behind the TRACE_BACKEND=ax env flag and is
 documented as the enterprise upgrade path: same OpenInference spans, swap the
 exporter target and add space-id / api-key headers. That is the "better
-together" production story for Step 7, not the local default.
+together" production story, not the local default.
 
-This module also exposes `record_retrieval_span(...)`, the at-least-one MANUAL
-custom span the brief requires. It wraps the Bedrock KB retrieval and records
+This module also exposes `record_retrieval_span(...)`, the manual custom span
+at the heart of the build. It wraps the Bedrock KB retrieval and records
 OpenInference RETRIEVER-kind attributes: retrieval.documents (id + score + text
 per document), plus kb_id, token counts, and latency_ms. See local_agent.py for
 the call site.

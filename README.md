@@ -112,8 +112,7 @@ partner-sa-assessment/
   notebooks/               # better_together_cookbook.ipynb (narrative walkthrough)
   tests/                   # pytest: groundedness eval + judge-vs-human math
   .github/workflows/ci.yml # CI: unit tests + offline eval smoke (green badge)
-  ALYX_HANDS_ON.md         # Alyx (Arize AX copilot) hands-on walkthrough
-  DESIGN_MEMO.md           # Step 7: partner choice + production-readiness plan
+  DESIGN_MEMO.md           # partner choice + production-readiness plan
   Dockerfile               # optional container image (TRACK A); offline smoke test by default
   requirements.txt         # laptop-side deps (pinned)
   .env.example
@@ -152,12 +151,11 @@ Start Phoenix in its own terminal first (Steps 1, 3, 4, 6 export to it):
 phoenix serve            # -> http://localhost:6006
 ```
 
-> **Step 1 choice (partner + sample):** instead of cloning an off-the-shelf
-> sample, this is a *purpose-built* Strands agent on Bedrock — the assessment's
-> allowed extra-credit path — so every piece (the tool, the manual span, the
-> evals, the feedback loop) is one I can explain, modify, and extend on demand.
-> The partner rationale ("AWS owns the build surface, Arize owns the trust
-> surface") is in `DESIGN_MEMO.md` §1.
+> **Why purpose-built (not an off-the-shelf sample):** this is a purpose-built
+> Strands agent on Bedrock, so every piece (the tool, the manual span, the evals,
+> the feedback loop) is transparent and extensible rather than a black box. The
+> partner rationale ("AWS owns the build surface, Arize owns the trust surface")
+> is in `DESIGN_MEMO.md` §1.
 
 ### Step 1 + 3: partner agent + Phoenix instrumentation + manual span
 
@@ -255,7 +253,7 @@ The loop uses the `phoenix.client` SDK (the programmatic equivalent of the PX
 CLI) to pull spans, log annotations, and create the dataset; the PX CLI / Phoenix
 skills are an interchangeable surface for the same operations in a dev workflow.
 
-**Scheduling (the "job definition / workflow" the brief asks for).** The loop is
+**Scheduling (the job definition / workflow).** The loop is
 a single idempotent entrypoint, so scheduling it is a one-liner. As cron:
 
 ```
@@ -352,8 +350,8 @@ which is a separate deployment surface, not a missing piece of the pipeline.
 
 `MOCK_KB=true` is a convenience, not a crutch: real Bedrock KB is the default and
 was the path verified above. The offline corpus exists only so the full trace +
-eval + feedback loop still runs end-to-end if KB provisioning stalls before the
-panel. It is opt-in and disclosed here.
+eval + feedback loop still runs end-to-end if KB provisioning stalls before a
+live run. It is opt-in and disclosed here.
 
 ---
 

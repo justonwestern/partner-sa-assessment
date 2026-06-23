@@ -1,9 +1,7 @@
 # Design Memo: Partner Framework Agent, Observed in Phoenix / Arize
 
-**Author:** Partner Solutions Architect candidate
-**Scope:** Step 7 of the technical assessment. Partner choice, better-together
-rationale, and a production-readiness plan. This memo reasons about production;
-it does not build cloud infrastructure.
+**Scope:** Partner choice, better-together rationale, and a production-readiness
+plan. This memo reasons about production; it does not build cloud infrastructure.
 
 ---
 
@@ -41,7 +39,7 @@ dataset to gate the production rollout. This repo is that play, in code.
 
 ## 2. Local Phoenix default, Arize AX as the enterprise upgrade
 
-The assessment build targets **local Phoenix** (`phoenix serve`,
+This build targets **local Phoenix** (`phoenix serve`,
 `localhost:6006`) so the whole loop runs on a laptop with no cloud account. The
 exact same OpenInference spans upgrade to **Arize AX** by flipping
 `TRACE_BACKEND=ax` and supplying space-id / API-key headers (see

@@ -6,13 +6,13 @@ TRACK A: a Strands agent running locally, sending traces to LOCAL PHOENIX by
 default (Step 1 + Step 3). It is the same agent code you later deploy on Bedrock
 AgentCore in TRACK B (agentcore/strands_claude.py); only the runtime differs.
 
-What changed from the skeleton:
-  * tracing now targets local Phoenix (see src/instrumentation.py); AX is behind
+Implementation notes:
+  * tracing targets local Phoenix (see src/instrumentation.py); AX is behind
     TRACE_BACKEND=ax.
   * `ask()` wraps each turn so that when the agent's answer relied on partner-doc
     retrieval, we ALSO emit a manual OpenInference RETRIEVER span via
-    record_retrieval_span(). That gives Step 3 its required custom span with doc
-    ids, scores, kb_id, token counts, and latency.
+    record_retrieval_span(). That is the custom span with doc ids, scores,
+    kb_id, token counts, and latency.
 
 Run (mock fallback, no AWS needed):
     phoenix serve            # in another terminal -> http://localhost:6006
@@ -71,7 +71,7 @@ def ask(agent: Agent, prompt: str) -> str:
     decision with a heuristic so the manual RETRIEVER span (with doc ids/scores/
     kb_id/tokens/latency) is recorded for partner-integration questions. In a
     fully production build you would instead emit this span from inside the tool
-    wrapper; we keep it here so the candidate can read the whole flow top-down.
+    wrapper; we keep it here so you can read the whole flow top-down.
     """
     lower = prompt.lower()
     # Wrap the whole turn in ONE span so the manual RETRIEVER span and the
