@@ -10,6 +10,7 @@ boto3==1.43.36
 # Observability: LOCAL PHOENIX is the default backend (Step 3).
 arize-phoenix==17.9.0                          # phoenix serve + span store
 arize-phoenix-client==2.9.0                    # phoenix.client: pull spans, log annotations, datasets
+pydantic-ai-slim==1.107.0                      # transitive dep of arize-phoenix; pin <2 (2.0.0 removed pydantic_ai.mcp.MCPServerStreamableHTTP and breaks `import phoenix`)
 openinference-instrumentation-strands-agents==0.1.3
 openinference-semantic-conventions==0.1.30     # SpanAttributes / DocumentAttributes for the manual span
 
