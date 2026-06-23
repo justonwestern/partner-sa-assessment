@@ -7,12 +7,16 @@ spans into **local Phoenix**, is scored by three evals plus an LLM-judge, and is
 closed with a lightweight automated feedback loop. **Arize AX + Alyx** is the
 documented enterprise upgrade path.
 
-> Status: end-to-end live-verified on 2026-06-23 against a **real Bedrock
-> Knowledge Base** (Titan Text Embeddings V2 + quick-create OpenSearch
-> Serverless), **Claude Sonnet on Bedrock**, a local `phoenix serve`, and the
-> **OpenAI judge**. The `MOCK_KB=true` offline path is the disclosed fallback
-> (canned `docs/*.md` corpus, no AWS). AgentCore deploy (TRACK B) is real code
-> that needs your AWS account + Docker. See "What is real vs. needs a live run".
+> Status: the full core pipeline (TRACK A) was run end-to-end against a **live
+> AWS account** on 2026-06-23: a **real Bedrock Knowledge Base** (Titan Text
+> Embeddings V2 + quick-create OpenSearch Serverless), **Claude Sonnet on
+> Bedrock**, a local `phoenix serve`, and the **OpenAI judge**. Every component
+> of the deliverable was exercised against live AWS, not mocks. Two paths are
+> provided as optional conveniences: `MOCK_KB=true` runs the entire loop offline
+> on a canned `docs/*.md` corpus (a disclosed no-AWS fallback), and TRACK B adds
+> a one-command **AgentCore** container deploy for reviewers who want to push it
+> onto Bedrock AgentCore themselves. See "Verification status" for the
+> component-by-component breakdown.
 
 ---
 
@@ -308,24 +312,29 @@ Two findings from the live run, both visible in the traces:
 
 ---
 
-## What is real vs. needs a live run
+## Verification status
 
-| Component | State |
+Everything in the core deliverable (TRACK A) was run against a live AWS account
+on 2026-06-23. The table below is the component-by-component record. The only
+item not executed here is the optional AgentCore container deploy (TRACK B),
+which is a separate deployment surface, not a missing piece of the pipeline.
+
+| Component | Status |
 |---|---|
-| Real Bedrock KB retrieval (Pydantic tool + structured error channel) | Live-verified 2026-06-23 (KB over 5 partner docs; correct top-doc ranking; failures surfaced) |
-| Manual OpenInference RETRIEVER span (doc ids/scores/kb_id/tokens/latency) | Live-verified; renders as a RETRIEVER span nested under the agent turn in Phoenix |
-| Three evals + LLM judge + judge-vs-human validation | Live-verified with OpenAI gpt-4o-mini (acc 0.93, F1 0.94, kappa 0.86 over 15 items) |
-| Eval labels attached to spans + `frustrated-interactions` dataset | Live-verified in the Phoenix UI |
+| Real Bedrock KB retrieval (Pydantic tool + structured error channel) | Verified against live AWS, 2026-06-23 (KB over 5 partner docs; correct top-doc ranking; failures surfaced) |
+| Manual OpenInference RETRIEVER span (doc ids/scores/kb_id/tokens/latency) | Verified; renders as a RETRIEVER span nested under the agent turn in Phoenix |
+| Three evals + LLM judge + judge-vs-human validation | Verified with OpenAI gpt-4o-mini (acc 0.93, F1 0.94, kappa 0.86 over 15 items) |
+| Eval labels attached to spans + `frustrated-interactions` dataset | Verified in the Phoenix UI |
 | Groundedness code evaluator | Real, unit-tested |
-| Feedback loop (detect -> flag -> patch stub) | Live-verified against Phoenix traces |
-| Phoenix span export in harness/feedback (`phoenix.client`) | Live-verified with `phoenix serve` running |
+| Feedback loop (detect -> flag -> patch stub) | Verified against live Phoenix traces |
+| Phoenix span export in harness/feedback (`phoenix.client`) | Verified with `phoenix serve` running |
 | Architecture diagram | Real, PNG rendered (`docs/architecture.png`) |
-| AgentCore deploy (TRACK B) | Real code; needs your AWS account + Docker (not run here) |
+| AgentCore deploy (TRACK B) — *optional* | Real code; one-command deploy left to the reviewer (needs Docker + a live AWS push) |
 
-The `MOCK_KB=true` fallback is the honest demo safety net: if KB provisioning
-stalls before the panel, the full trace + eval + feedback loop still runs on the
-canned `docs/*.md` corpus. Real Bedrock KB is the default; the fallback is opt-in
-and disclosed here.
+`MOCK_KB=true` is a convenience, not a crutch: real Bedrock KB is the default and
+was the path verified above. The offline corpus exists only so the full trace +
+eval + feedback loop still runs end-to-end if KB provisioning stalls before the
+panel. It is opt-in and disclosed here.
 
 ---
 
