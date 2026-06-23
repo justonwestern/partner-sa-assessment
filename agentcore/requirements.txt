@@ -1,0 +1,8 @@
+# Runtime-side deps shipped INTO the AgentCore container at deploy time.
+# Keep this minimal -- it is the container's dependency set, not your laptop's.
+bedrock-agentcore
+strands-agents
+openinference-instrumentation-strands-agents
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-grpc

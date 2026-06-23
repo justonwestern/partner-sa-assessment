@@ -1,0 +1,62 @@
+[
+  {
+    "query": "How does Arize integrate with AWS Bedrock for agentic RAG?",
+    "answer": "[aws_bedrock_overview.md] Arize sits above Bedrock as the observability and eval backbone: Phoenix traces every Bedrock invocation via OpenInference, and AX adds retention, online evals, and RBAC for the co-sell motion.",
+    "human_label": "pass"
+  },
+  {
+    "query": "Why would a Databricks customer add Arize on top of MLflow?",
+    "answer": "[databricks_mosaic_overview.md] MLflow tracks training-time experiments while Arize tracks production traces, tool-use trees, and online evals, so the two are complementary and Arize ingests MLflow run IDs into AX experiments.",
+    "human_label": "pass"
+  },
+  {
+    "query": "What is the NVIDIA NeMo on-prem AI observability story?",
+    "answer": "[nvidia_nemo_overview.md] Arize AX deploys inside the customer's NVIDIA AI Enterprise stack so regulated customers get span-level observability and the NeMo data flywheel without shipping traces to a third-party SaaS.",
+    "human_label": "pass"
+  },
+  {
+    "query": "Does Phoenix trace Claude API calls from Anthropic?",
+    "answer": "[anthropic_partnership_overview.md] Yes: the OpenInference Anthropic instrumentor captures every Claude invocation, including Tools API and thinking-block content, as a span with input, output, latency, and token usage.",
+    "human_label": "pass"
+  },
+  {
+    "query": "Which GCP Vertex artifacts flow back into Arize AX?",
+    "answer": "[gcp_vertex_overview.md] Vertex Pipelines run metadata, Model Garden identifiers, and Vertex eval artifacts flow into AX as experiment versions, span attributes, and regression datasets.",
+    "human_label": "pass"
+  },
+  {
+    "query": "What co-sell motions does Arize run with AWS?",
+    "answer": "[aws_bedrock_overview.md] re:Invent and APN breakouts, joint 'Evaluating and Observing AI on AWS' workshops, and sales pairing with AWS ProServe and Bedrock specialist sellers on customer POCs.",
+    "human_label": "pass"
+  },
+  {
+    "query": "How does Arize integrate with AWS Bedrock?",
+    "answer": "Arize is a great tool that helps with lots of AI things and works with many clouds including AWS, so you should definitely use it together with Bedrock for the best results.",
+    "human_label": "fail"
+  },
+  {
+    "query": "What is the NVIDIA NeMo on-prem story?",
+    "answer": "I think NVIDIA makes GPUs and Arize does monitoring, so probably they can be combined somehow on premises for some customers.",
+    "human_label": "fail"
+  },
+  {
+    "query": "Why add Arize on top of MLflow on Databricks?",
+    "answer": "Because more tools are always better and you can never have too much observability in your stack when running models in production.",
+    "human_label": "fail"
+  },
+  {
+    "query": "What is the best recipe for sourdough bread?",
+    "answer": "I don't have a documented answer for that; this assistant only covers Arize partner integrations.",
+    "human_label": "fail"
+  },
+  {
+    "query": "How does Arize integrate with AWS Bedrock for agentic RAG?",
+    "answer": "[aws_bedrock_overview.md] Customers pair Bedrock Knowledge Bases, Bedrock Agents, and Strands for orchestration, then layer Arize on top for trace-level debugging of hallucination and tool-call latency, with AX gating the production rollout. This answer also goes on at length about re:Invent, ProServe pairing, joint workshops, marketplace listings, and a half-dozen other co-sell surfaces well beyond three sentences to pad the response unnecessarily.",
+    "human_label": "fail"
+  },
+  {
+    "query": "Does Anthropic Claude Code stream traces to Phoenix?",
+    "answer": "[anthropic_partnership_overview.md] Yes, Claude Code workflows can stream traces to Phoenix locally for debugging agentic dev flows, and production Claude agents emit span-level data Arize evaluates for hallucination and tool-use correctness.",
+    "human_label": "pass"
+  }
+]
