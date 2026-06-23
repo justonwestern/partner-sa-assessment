@@ -16,6 +16,28 @@ documented enterprise upgrade path.
 
 ---
 
+## Highlights for reviewers
+
+If you're skimming, these are the parts worth a close look:
+
+- **Custom OpenInference RETRIEVER span** (`src/instrumentation.py`) around the
+  Bedrock KB call, carrying `retrieval.documents.*` (doc id + score), `kb_id`,
+  token counts, and `latency_ms`. It is emitted through its own untransformed
+  tracer so the Strands span processor cannot reclassify it away from
+  `kind=RETRIEVER` (see the `_MANUAL_TRACER` rationale in the code).
+- **A validated LLM judge with a real disagreement** (`src/evaluators/llm_judge.py`):
+  the rubric judge is hand-label-validated (acc 0.93, Cohen's kappa 0.86 over 15
+  items incl. 3 borderlines), and the single judge-vs-human disagreement is
+  surfaced, not hidden.
+- **Evals written back onto the traces** (`src/feedback_loop.py`): each label is
+  logged to its Phoenix span as an annotation, the frustrated turns become a
+  Phoenix dataset (Step 5.1), and the loop flags threshold breaches and drafts a
+  human-gated prompt patch.
+- **Honest failure modes** from the live run — see "What the observability
+  caught" below.
+
+---
+
 ## Architecture (local default)
 
 ```
@@ -34,7 +56,7 @@ documented enterprise upgrade path.
        v
    OTLP/HTTP exporter ----> LOCAL PHOENIX (http://localhost:6006)
                                 |
-                                +--> run_experiments  (>=10 queries, metrics,
+                                +--> run_experiments  (12 queries, metrics,
                                 |                       span export to parquet/csv)
                                 +--> evaluators        (frustration, tool-selection,
                                 |                       rubric judge + validation,
@@ -49,7 +71,10 @@ documented enterprise upgrade path.
    the whole loop runs with no AWS account.
 ```
 
-A rendered version is in `docs/architecture.png` (run `python docs/architecture.py`).
+The rendered diagram in `docs/architecture.png` is the richer version: two
+ownership swimlanes (**AWS build surface** vs **Arize trust surface**) with a
+production **OTel Collector** (tail-sampling + PII redaction) on the telemetry
+hop. Run `python docs/architecture.py` to regenerate it.
 
 ---
 
@@ -76,7 +101,9 @@ strands-agentcore-arize-cookbook/
     architecture.py        # renders architecture.png (matplotlib)
     architecture.png       # the joint AWS + Arize reference diagram
     *_overview.md          # partner overview docs (canned MOCK_KB corpus)
-  experiments/             # metrics_report.txt, spans.parquet/csv, feedback_report.md
+  experiments/             # metrics_report.txt, query_records.json, feedback_report.md,
+                           #   spans_sample.md (committed); spans.parquet/csv (gitignored)
+  notebooks/               # better_together_cookbook.ipynb (narrative walkthrough)
   DESIGN_MEMO.md           # Step 7: partner choice + production-readiness plan
   requirements.txt         # laptop-side deps
   .env.example
@@ -235,6 +262,23 @@ python docs/architecture.py        # writes docs/architecture.png
 ```bash
 cd agentcore && python deploy.py
 ```
+
+---
+
+## What the observability caught (debugging insights)
+
+Two findings from the live run, both visible in the traces:
+
+- **Stale-context answers.** On repeated and frustrated partner questions the
+  agent sometimes answered from earlier conversation context *without re-calling*
+  `search_partner_docs` (per-turn tool-selection drops to 7/12, and the forced
+  bad-KB turn answered confidently while its retrieval span recorded status
+  ERROR). "Confident answer despite a failed/absent retrieval" is exactly the
+  joint-quality gap a partner SA flags — and the tool-selection eval catches it.
+- **A judge blind spot.** On a borderline answer with no citation, gpt-4o-mini
+  claimed it *was* cited and passed it (the one validation disagreement). The fix
+  is the deterministic citation check in `code_evaluator.py`: cheap code for an
+  objective criterion, the LLM judge for the subjective ones.
 
 ---
 
