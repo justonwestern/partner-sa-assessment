@@ -115,6 +115,13 @@ Start Phoenix in its own terminal first (Steps 1, 3, 4, 6 export to it):
 phoenix serve            # -> http://localhost:6006
 ```
 
+> **Step 1 choice (partner + sample):** instead of cloning an off-the-shelf
+> sample, this is a *purpose-built* Strands agent on Bedrock — the assessment's
+> allowed extra-credit path — so every piece (the tool, the manual span, the
+> evals, the feedback loop) is one I can explain, modify, and extend on demand.
+> The partner rationale ("AWS owns the build surface, Arize owns the trust
+> surface") is in `DESIGN_MEMO.md` §1.
+
 ### Step 1 + 3: partner agent + Phoenix instrumentation + manual span
 
 ```bash
@@ -157,6 +164,12 @@ per-turn from the tool spans, reported separately from the harness's forced
 retrievals), and failure rate. Live run: p50 ~5.5s, agent tool-selection 7/12,
 2 observable retrieval failures.
 
+The full span export (`experiments/spans.parquet` + `.csv`) is gitignored for
+size; regenerate it with the command above against a running Phoenix. The
+committed evidence is the digested `experiments/metrics_report.txt`,
+`query_records.json`, `feedback_report.md`, and a small human-readable
+`experiments/spans_sample.md` excerpt of the exported spans.
+
 ### Step 5: three evals + LLM judge + validation
 
 ```bash
@@ -174,6 +187,18 @@ over-credited the citation criterion — mitigation: the deterministic
 Frustration, Partner-Native Tool-Selection, and the custom rubric judge
 ("Partner Answer Quality"); `code_evaluator.py` is the 4th, code-based eval.
 
+**Methodology.** Each eval is an LLM judge that returns a label plus a
+one-sentence English rationale (the "English error term" the feedback loop
+consumes). *User Frustration* reads the user message for frustration signals
+(repetition, "again/still", all-caps, "that's not what I asked") and labels
+`frustrated` / `not_frustrated`. *Tool-Selection* is told the query and whether
+the partner-native `search_partner_docs` actually ran, then judges whether that
+was the right call. The *rubric judge* scores against an explicit 4-criterion
+rubric (grounded, on-topic, cited, concise). Trust is established by validating
+the rubric judge against the hand-labeled set and reporting agreement +
+disagreements (above); `feedback_loop.py` then writes each label back onto the
+Phoenix span as an annotation and filters the frustrated turns into a dataset.
+
 ### Step 6: automated feedback loop
 
 ```bash
@@ -188,6 +213,10 @@ onto the Phoenix spans as annotations** (`user_frustration`,
 `frustrated-interactions` Phoenix dataset** (Step 5.1: filter + dataset),
 clusters failure themes, raises flags past threshold, and writes
 `experiments/feedback_report.md` with a human-in-the-loop prompt-patch stub.
+
+The loop uses the `phoenix.client` SDK (the programmatic equivalent of the PX
+CLI) to pull spans, log annotations, and create the dataset; the PX CLI / Phoenix
+skills are an interchangeable surface for the same operations in a dev workflow.
 
 ### Step 7: production-readiness memo
 
