@@ -66,31 +66,65 @@ def _pull_from_phoenix(limit: int = 50) -> List[Dict]:
     harness records. Defensive about column names across Phoenix versions.
     """
     project = os.environ.get("ARIZE_PROJECT_NAME", "strands-agentcore-cookbook-local")
+    endpoint = os.environ.get("PHOENIX_ENDPOINT", "http://localhost:6006")
     try:
-        import phoenix as px
+        # Newer Phoenix: phoenix.client.Client().spans.get_spans_dataframe(...);
+        # older releases used phoenix.Client().get_spans_dataframe(...). Try both.
+        try:
+            from phoenix.client import Client
 
-        client = px.Client(endpoint=os.environ.get("PHOENIX_ENDPOINT", "http://localhost:6006"))
-        spans = client.get_spans_dataframe(project_name=project)
+            spans = Client(base_url=endpoint).spans.get_spans_dataframe(project_name=project)
+        except Exception:
+            import phoenix as px
+
+            spans = px.Client(endpoint=endpoint).get_spans_dataframe(project_name=project)
         if spans is None or len(spans) == 0:
             return []
         in_col = next((c for c in spans.columns if c.endswith("input.value")), None)
         out_col = next((c for c in spans.columns if c.endswith("output.value")), None)
-        if in_col is None:
+        kind_col = "span_kind" if "span_kind" in spans.columns else None
+        trace_col = next((c for c in spans.columns if c.endswith("trace_id")), None)
+        span_col = ("context.span_id" if "context.span_id" in spans.columns
+                    else next((c for c in spans.columns if c.endswith("span_id")), None))
+        if in_col is None or kind_col is None:
             return []
+
+        # One clean row per USER TURN = the AGENT (invoke_agent) spans, whose
+        # input.value is the user prompt and output.value the final answer. The
+        # LLM/CHAIN sub-spans carry raw chat-message JSON, which is not a query,
+        # so iterating every span (the old behaviour) polluted the eval set.
+        agent = spans[spans[kind_col] == "AGENT"].copy()
+        if "start_time" in agent.columns:
+            agent = agent.sort_values("start_time", ascending=False)  # most recent first
+
+        # Partner-tool use is read per-trace: did this turn's trace contain a
+        # TOOL span for the partner-native `search_partner_docs` specifically
+        # (NOT just any tool such as check_model_access)? That is the decision
+        # the partner-SA tool-selection eval actually cares about.
+        toolname_col = next((c for c in spans.columns if c.endswith("tool.name")), None)
+        tool_traces = set()
+        if trace_col:
+            tool_spans = spans[spans[kind_col] == "TOOL"]
+            if toolname_col is not None:
+                tool_spans = tool_spans[tool_spans[toolname_col] == "search_partner_docs"]
+            tool_traces = set(tool_spans[trace_col].dropna())
+
         rows: List[Dict] = []
-        for _, row in spans.head(limit).iterrows():
-            q = str(row.get(in_col, "") or "")
-            a = str(row.get(out_col, "") or "") if out_col else ""
-            if not q:
+        seen = set()
+        for _, row in agent.iterrows():
+            q = str(row.get(in_col, "") or "").strip()
+            if not q or q == "nan" or q in seen:
                 continue
-            # Heuristic: did a retrieval span exist for this query? We approximate
-            # by checking the span name column when present.
-            name = str(row.get("name", "")).lower()
+            seen.add(q)  # dedupe repeated prompts across multiple runs
+            a = str(row.get(out_col, "") or "") if out_col else ""
             rows.append({
                 "query": q,
                 "answer": a,
-                "tool_invoked": "retrieve" in name,
+                "tool_invoked": bool(trace_col and row.get(trace_col) in tool_traces),
+                "span_id": (str(row.get(span_col)) if span_col else None),
             })
+            if len(rows) >= limit:
+                break
         return rows
     except Exception as exc:  # noqa: BLE001
         print(f"  [pull] Phoenix not reachable ({exc}); using harness records.")
@@ -105,7 +139,8 @@ def _pull_from_records() -> List[Dict]:
     recs = json.loads(path.read_text(encoding="utf-8"))
     return [
         {"query": r["prompt"], "answer": r.get("answer", ""),
-         "tool_invoked": bool(r.get("tool_invoked"))}
+         # Partner-native tool specifically, not just any tool the agent ran.
+         "tool_invoked": "search_partner_docs" in (r.get("agent_tools_used") or [])}
         for r in recs
     ]
 
@@ -238,6 +273,83 @@ def _write_report(patterns: Dict, results: List[Dict]) -> str:
     return "\n".join(lines)
 
 
+def _log_annotations_to_phoenix(results: List[Dict]) -> None:
+    """Step 5.1: attach the three eval labels back onto their Phoenix spans as
+    annotations, so they are filterable in the Phoenix UI. Best-effort and needs
+    span_id, which only the live-Phoenix pull provides (not the records fallback).
+    """
+    rows = [r for r in results if r.get("span_id")]
+    if not rows:
+        print("  [annotate] no span_ids (records fallback) -> skipped span annotation.")
+        return
+    endpoint = os.environ.get("PHOENIX_ENDPOINT", "http://localhost:6006")
+    try:
+        import pandas as pd
+        from phoenix.client import Client
+
+        client = Client(base_url=endpoint)
+        specs = [
+            ("user_frustration", "frustration", "frustration_explanation"),
+            ("partner_tool_selection", "tool_selection", "tool_selection_explanation"),
+            ("partner_answer_quality", "rubric", "rubric_explanation"),
+        ]
+        for ann_name, label_key, expl_key in specs:
+            df = pd.DataFrame(
+                {
+                    "span_id": [r["span_id"] for r in rows],
+                    "label": [str(r.get(label_key, "")) for r in rows],
+                    "explanation": [str(r.get(expl_key, "")) for r in rows],
+                }
+            ).set_index("span_id")
+            client.spans.log_span_annotations_dataframe(
+                dataframe=df, annotation_name=ann_name, annotator_kind="LLM",
+            )
+        print(f"  [annotate] logged user_frustration / partner_tool_selection / "
+              f"partner_answer_quality onto {len(rows)} spans in Phoenix.")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  [annotate] span annotation skipped: {exc}")
+
+
+def _create_frustrated_dataset(results: List[Dict]) -> None:
+    """Step 5.1: filter the frustrated interactions and register them as a
+    Phoenix dataset (a regression set the fix workflow can target)."""
+    frustrated = [r for r in results if r.get("frustration") == "frustrated"]
+    if not frustrated:
+        print("  [dataset] no frustrated interactions detected -> dataset not created.")
+        return
+    endpoint = os.environ.get("PHOENIX_ENDPOINT", "http://localhost:6006")
+    try:
+        import time
+
+        import pandas as pd
+        from phoenix.client import Client
+
+        client = Client(base_url=endpoint)
+        df = pd.DataFrame(
+            [
+                {
+                    "query": r["query"],
+                    "answer": r.get("answer", ""),
+                    "frustration_explanation": r.get("frustration_explanation", ""),
+                }
+                for r in frustrated
+            ]
+        )
+        name = f"frustrated-interactions-{time.strftime('%Y%m%d-%H%M%S')}"
+        client.datasets.create_dataset(
+            name=name,
+            dataframe=df,
+            input_keys=["query"],
+            output_keys=["answer"],
+            metadata_keys=["frustration_explanation"],
+            dataset_description="Turns flagged frustrated by the user-frustration eval.",
+        )
+        print(f"  [dataset] created Phoenix dataset '{name}' with "
+              f"{len(frustrated)} frustrated example(s).")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  [dataset] frustrated-interactions dataset skipped: {exc}")
+
+
 def main() -> None:
     offline = "--offline" in sys.argv
     if not offline and not os.getenv("OPENAI_API_KEY"):
@@ -260,6 +372,11 @@ def main() -> None:
     print("Running evals...")
     results = _evaluate(rows, judge_fn)
     patterns = _detect_patterns(results)
+
+    # Step 5.1: attach eval labels onto the Phoenix spans and build a dataset of
+    # the frustrated interactions (both no-ops gracefully on the records fallback).
+    _log_annotations_to_phoenix(results)
+    _create_frustrated_dataset(results)
 
     report = _write_report(patterns, results)
     REPORT_PATH.write_text(report + "\n", encoding="utf-8")

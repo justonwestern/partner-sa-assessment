@@ -39,7 +39,7 @@ import time
 from pathlib import Path
 from typing import Dict, List
 
-from src.instrumentation import init_tracing, record_retrieval_span
+from src.instrumentation import init_tracing, record_retrieval_span, get_tracer
 from src.local_agent import build_agent
 from src.tools import retrieve_partner_docs
 
@@ -65,7 +65,36 @@ QUERY_PLAN: List[Dict] = [
     {"id": "fail-badkb", "kind": "fail_bad_kb", "prompt": "How does Arize integrate with AWS Bedrock?"},
     {"id": "fail-irrelevant", "kind": "fail_irrelevant", "prompt": "What is the best recipe for sourdough bread?"},
     {"id": "fail-toolerror", "kind": "fail_tool_error", "prompt": "Trigger a retrieval tool error on purpose."},
+    # ---- Frustrated-user turns (drive the Step 5.1 user-frustration eval) ----
+    {"id": "frustrated-1", "kind": "frustrated",
+     "prompt": "This is the THIRD time I've asked and you STILL haven't answered: how does Arize integrate with AWS Bedrock?!"},
+    {"id": "frustrated-2", "kind": "frustrated",
+     "prompt": "That is NOT what I asked. Again: does Phoenix actually trace Claude calls, yes or no??"},
 ]
+
+
+def _agent_tools_this_turn(agent, msgs_before: int) -> tuple:
+    """Tools the AGENT actually invoked in THIS turn.
+
+    NOTE: AgentResult.metrics.tool_metrics is CUMULATIVE across the agent's
+    lifetime (the agent is reused across queries), so it cannot describe a single
+    turn. Instead we scan the messages appended during this turn for Bedrock
+    'toolUse' content blocks. Defensive: degrades to (0, []) on any Strands
+    message-format change rather than crashing the harness.
+    """
+    names: List[str] = []
+    try:
+        msgs = getattr(agent, "messages", []) or []
+        for m in msgs[msgs_before:]:
+            content = m.get("content") if isinstance(m, dict) else None
+            for blk in (content or []):
+                if isinstance(blk, dict) and "toolUse" in blk:
+                    nm = (blk.get("toolUse") or {}).get("name")
+                    if nm:
+                        names.append(str(nm))
+    except Exception:  # noqa: BLE001 - telemetry must never break the harness
+        pass
+    return len(names), sorted(set(names))
 
 
 def _run_one(agent, item: Dict) -> Dict:
@@ -80,8 +109,11 @@ def _run_one(agent, item: Dict) -> Dict:
         "id": item["id"],
         "kind": kind,
         "prompt": prompt,
-        "tool_invoked": False,
+        "tool_invoked": False,        # harness-side: the forced retrieval ran
         "tool_error": False,
+        "agent_tool_invoked": False,  # did the AGENT actually choose a tool?
+        "agent_tool_calls": 0,
+        "agent_tools_used": [],
         "answer": "",
         "latency_ms": 0.0,
         "approx_tokens": 0,
@@ -96,43 +128,54 @@ def _run_one(agent, item: Dict) -> Dict:
                   "nvidia", "nemo", "anthropic", "claude", "partner")
     )
 
-    if exercises_kb:
-        # Inject the failure conditions for the fail_* kinds.
-        prev_kb = os.environ.get("KB_ID")
-        prev_mock = os.environ.get("MOCK_KB")
+    # Wrap the whole query in ONE span so the manual RETRIEVER span and the
+    # agent's LLM/tool spans share a single trace (matching local_agent.ask()),
+    # instead of the retrieval span landing as a separate root trace.
+    with get_tracer().start_as_current_span("agent_turn"):
+        if exercises_kb:
+            # Inject the failure conditions for the fail_* kinds.
+            prev_kb = os.environ.get("KB_ID")
+            prev_mock = os.environ.get("MOCK_KB")
+            try:
+                if kind == "fail_bad_kb":
+                    # Force a real (non-mock) call against a bogus KB id so the
+                    # bedrock retrieve raises and we capture a structured error.
+                    os.environ["MOCK_KB"] = "false"
+                    os.environ["KB_ID"] = "kb-DOES-NOT-EXIST-000000"
+                elif kind == "fail_tool_error":
+                    # Unset KB_ID on the real path -> structured "KB_ID not set" error.
+                    os.environ["MOCK_KB"] = "false"
+                    os.environ.pop("KB_ID", None)
+
+                result = retrieve_partner_docs(prompt)
+                record_retrieval_span(prompt, result)
+                record["tool_invoked"] = True
+                record["tool_error"] = result.is_error
+                record["approx_tokens"] += sum(len(d.text) for d in result.documents) // 4
+            finally:
+                # Restore env so later queries are unaffected.
+                if prev_kb is None:
+                    os.environ.pop("KB_ID", None)
+                else:
+                    os.environ["KB_ID"] = prev_kb
+                if prev_mock is None:
+                    os.environ.pop("MOCK_KB", None)
+                else:
+                    os.environ["MOCK_KB"] = prev_mock
+
+        # Always run the agent so there is an LLM span in the trace.
+        # Snapshot the message count first so we can read THIS turn's tool calls.
+        msgs_before = len(getattr(agent, "messages", []) or [])
         try:
-            if kind == "fail_bad_kb":
-                # Force a real (non-mock) call against a bogus KB id so the
-                # bedrock retrieve raises and we capture a structured error.
-                os.environ["MOCK_KB"] = "false"
-                os.environ["KB_ID"] = "kb-DOES-NOT-EXIST-000000"
-            elif kind == "fail_tool_error":
-                # Unset KB_ID on the real path -> structured "KB_ID not set" error.
-                os.environ["MOCK_KB"] = "false"
-                os.environ.pop("KB_ID", None)
-
-            result = retrieve_partner_docs(prompt)
-            record_retrieval_span(prompt, result)
-            record["tool_invoked"] = True
-            record["tool_error"] = result.is_error
-            record["approx_tokens"] += sum(len(d.text) for d in result.documents) // 4
-        finally:
-            # Restore env so later queries are unaffected.
-            if prev_kb is None:
-                os.environ.pop("KB_ID", None)
-            else:
-                os.environ["KB_ID"] = prev_kb
-            if prev_mock is None:
-                os.environ.pop("MOCK_KB", None)
-            else:
-                os.environ["MOCK_KB"] = prev_mock
-
-    # Always run the agent so there is an LLM span in the trace.
-    try:
-        answer = str(agent(prompt))
-    except Exception as exc:  # noqa: BLE001 - record, do not crash the harness
-        answer = f"AGENT_ERROR: {type(exc).__name__}: {exc}"
-        record["tool_error"] = record["tool_error"] or True
+            result_obj = agent(prompt)
+            answer = str(result_obj)
+            calls, names = _agent_tools_this_turn(agent, msgs_before)
+            record["agent_tool_calls"] = calls
+            record["agent_tools_used"] = names
+            record["agent_tool_invoked"] = calls > 0
+        except Exception as exc:  # noqa: BLE001 - record, do not crash the harness
+            answer = f"AGENT_ERROR: {type(exc).__name__}: {exc}"
+            record["tool_error"] = record["tool_error"] or True
 
     record["answer"] = answer
     record["approx_tokens"] += len(answer) // 4
@@ -147,11 +190,27 @@ def _export_spans_from_phoenix() -> bool:
     span export is the only step that depends on a live Phoenix instance.
     """
     project = os.environ.get("ARIZE_PROJECT_NAME", "strands-agentcore-cookbook-local")
-    try:
-        import phoenix as px
+    endpoint = os.environ.get("PHOENIX_ENDPOINT", "http://localhost:6006")
 
-        client = px.Client(endpoint=os.environ.get("PHOENIX_ENDPOINT", "http://localhost:6006"))
-        spans = client.get_spans_dataframe(project_name=project)
+    # Phoenix's span-export API moved. Newer Phoenix exposes
+    # phoenix.client.Client().spans.get_spans_dataframe(...); older releases used
+    # the top-level phoenix.Client().get_spans_dataframe(...). Try new, then old.
+    spans = None
+    try:
+        from phoenix.client import Client  # arize-phoenix-client
+
+        spans = Client(base_url=endpoint).spans.get_spans_dataframe(project_name=project)
+    except Exception as new_exc:  # noqa: BLE001
+        try:
+            import phoenix as px
+
+            spans = px.Client(endpoint=endpoint).get_spans_dataframe(project_name=project)
+        except Exception as old_exc:  # noqa: BLE001
+            print(f"  [export] span export skipped (no usable Phoenix client): "
+                  f"new={new_exc!r} old={old_exc!r}")
+            return False
+
+    try:
         if spans is None or len(spans) == 0:
             print("  [export] Phoenix returned no spans yet (still flushing?). Skipped.")
             return False
@@ -161,7 +220,7 @@ def _export_spans_from_phoenix() -> bool:
               f"{EXPORT_DIR/'spans.parquet'} (+ .csv)")
         return True
     except Exception as exc:  # noqa: BLE001
-        print(f"  [export] span export skipped (Phoenix not reachable?): {exc}")
+        print(f"  [export] span export failed during write: {exc}")
         return False
 
 
@@ -174,7 +233,11 @@ def _metrics_report(records: List[Dict]) -> str:
     p95 = latencies[min(len(latencies) - 1, int(round(0.95 * (len(latencies) - 1))))] if latencies else 0.0
 
     total_tokens = sum(r["approx_tokens"] for r in records)
-    tool_calls = sum(1 for r in records if r["tool_invoked"])
+    # The AGENT's real tool-selection rate (from AgentResult.metrics) is the
+    # meaningful number. `tool_invoked` only means the harness forced a retrieval
+    # for trace evidence, so it is reported separately below.
+    agent_tool_n = sum(1 for r in records if r.get("agent_tool_invoked"))
+    harness_retr_n = sum(1 for r in records if r["tool_invoked"])
     failures = sum(1 for r in records if r["tool_error"])
 
     # Rough cost model (illustrative): Claude Sonnet blended ~ $3 / 1M tokens.
@@ -188,17 +251,19 @@ def _metrics_report(records: List[Dict]) -> str:
     lines.append(f"queries run            : {n}")
     lines.append(f"latency p50 (ms)       : {p50:.1f}")
     lines.append(f"latency p95 (ms)       : {p95:.1f}")
-    lines.append(f"tool-invocation rate   : {tool_calls}/{n} = {tool_calls/n:.0%}")
+    lines.append(f"agent tool-selection   : {agent_tool_n}/{n} = {agent_tool_n/n:.0%}  (agent actually invoked a tool)")
+    lines.append(f"harness retrievals     : {harness_retr_n}/{n}  (forced for trace evidence)")
     lines.append(f"failure rate           : {failures}/{n} = {failures/n:.0%}")
     lines.append(f"total approx tokens    : {total_tokens}")
     lines.append(f"est cost @ ${cost_per_1m}/1M : ${est_cost:.6f}")
     lines.append("")
     lines.append("per-query:")
-    lines.append(f"  {'id':16s} {'kind':16s} {'lat_ms':>8s} {'tok':>6s} tool err")
+    lines.append(f"  {'id':16s} {'kind':16s} {'lat_ms':>8s} {'tok':>6s} {'agent_tool':>20s} err")
     for r in records:
+        atool = ",".join(r.get("agent_tools_used") or []) or "-"
         lines.append(
             f"  {r['id']:16s} {r['kind']:16s} {r['latency_ms']:8.1f} "
-            f"{r['approx_tokens']:6d} {str(r['tool_invoked']):5s} {str(r['tool_error'])}"
+            f"{r['approx_tokens']:6d} {atool:>20s} {str(r['tool_error'])}"
         )
     lines.append("=" * 60)
     return "\n".join(lines)

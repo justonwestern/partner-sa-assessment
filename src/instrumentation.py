@@ -30,6 +30,7 @@ TracerProvider is registered first.
 
 from __future__ import annotations
 
+import atexit
 import os
 from typing import Optional
 
@@ -59,6 +60,14 @@ from openinference.semconv.trace import (
 # is initialized. Populated by init_tracing().
 _TRACER: Optional[trace.Tracer] = None
 
+# Dedicated tracer for the hand-crafted RETRIEVER span. Its provider has NO
+# StrandsAgentsToOpenInferenceProcessor: that processor rewrites EVERY span
+# on_end (reclassifies kind -> CHAIN and buries unknown attributes under a
+# "metadata" blob), which would strip our OpenInference RETRIEVER conventions.
+# Routing the manual span through an untransformed provider preserves
+# kind=RETRIEVER and retrieval.documents.* so Phoenix renders a real retriever.
+_MANUAL_TRACER: Optional[trace.Tracer] = None
+
 
 def _phoenix_endpoint() -> str:
     """Local Phoenix OTLP traces endpoint (override with PHOENIX_ENDPOINT)."""
@@ -73,7 +82,7 @@ def init_tracing() -> TracerProvider:
     Default backend is LOCAL PHOENIX. Set TRACE_BACKEND=ax to ship the SAME
     OpenInference spans to Arize AX instead (the enterprise upgrade path).
     """
-    global _TRACER
+    global _TRACER, _MANUAL_TRACER
 
     project_name = os.environ.get(
         "ARIZE_PROJECT_NAME", "strands-agentcore-cookbook-local"
@@ -114,6 +123,31 @@ def init_tracing() -> TracerProvider:
         )
         dest = _phoenix_endpoint()
 
+    # ------------------------------------------------------------------ #
+    # Manual-span provider: SAME resource + SAME destination, but WITHOUT the
+    # Strands->OpenInference processor. record_retrieval_span()'s hand-built
+    # RETRIEVER span goes through this so it reaches Phoenix unmodified
+    # (kind=RETRIEVER, retrieval.documents.* intact). It still nests under the
+    # active agent span because parenting is taken from the OTel context, not
+    # the provider.
+    # ------------------------------------------------------------------ #
+    manual_provider = TracerProvider(resource=resource)
+    if backend == "ax":
+        manual_exporter = OTLPSpanExporter(
+            endpoint="https://otlp.arize.com/v1/traces",
+            headers={
+                "authorization": os.environ["ARIZE_API_KEY"],
+                "arize-space-id": os.environ["ARIZE_SPACE_ID"],
+                "arize-interface": "python",
+            },
+        )
+    else:
+        manual_exporter = OTLPSpanExporter(endpoint=_phoenix_endpoint())
+    manual_provider.add_span_processor(BatchSpanProcessor(manual_exporter))
+    # main() only flushes the global provider; ensure manual spans flush on exit.
+    atexit.register(manual_provider.shutdown)
+    _MANUAL_TRACER = manual_provider.get_tracer("strands-agentcore-cookbook-manual")
+
     # IMPORTANT: register globally. Strands' Agent calls
     # opentelemetry.trace.get_tracer(...), which reads the GLOBAL provider.
     trace.set_tracer_provider(provider)
@@ -151,7 +185,10 @@ def record_retrieval_span(query: str, result, parent_context=None):
     inside the agent invocation means the OpenInference processor nests it under
     the active agent span automatically.
     """
-    tracer = get_tracer()
+    # Use the untransformed manual tracer so the Strands processor does not
+    # reclassify this RETRIEVER span as CHAIN. Falls back to the shared tracer
+    # if tracing was never initialized (e.g., offline unit tests).
+    tracer = _MANUAL_TRACER or get_tracer()
     with tracer.start_as_current_span("retrieve_partner_docs") as span:
         # --- OpenInference span kind + input ---
         span.set_attribute(

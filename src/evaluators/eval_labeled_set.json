@@ -58,5 +58,23 @@
     "query": "Does Anthropic Claude Code stream traces to Phoenix?",
     "answer": "[anthropic_partnership_overview.md] Yes, Claude Code workflows can stream traces to Phoenix locally for debugging agentic dev flows, and production Claude agents emit span-level data Arize evaluates for hallucination and tool-use correctness.",
     "human_label": "pass"
+  },
+  {
+    "query": "How does Arize integrate with AWS Bedrock?",
+    "answer": "Arize sits above Bedrock as the observability and evaluation backbone: Phoenix traces every Bedrock invocation via OpenInference, and AX adds long-term retention and online evals for the co-sell motion.",
+    "human_label": "fail",
+    "note": "BORDERLINE: grounded, on-topic, and concise, but has NO citation. A strict reading of criterion 3 (cited) fails it; a lenient judge may pass it on the strength of the content."
+  },
+  {
+    "query": "Why would a Databricks customer add Arize on top of MLflow?",
+    "answer": "[databricks_mosaic_overview.md] MLflow handles training-time experiment tracking and model versions, while Arize covers production behavior. Arize ingests MLflow run IDs and attaches them to AX experiments. This gives teams a single pane of glass across offline and online evaluation. A common trigger is a Mosaic AI customer whose retrieval quality drops on real traffic.",
+    "human_label": "pass",
+    "note": "BORDERLINE: grounded, on-topic, and cited, but four sentences. Criterion 4 says 'roughly three or fewer', so a human reads it as a pass while a strict judge may fail it on length."
+  },
+  {
+    "query": "Why would a Databricks customer add Arize on top of MLflow?",
+    "answer": "[aws_bedrock_overview.md] Arize traces every Bedrock invocation via OpenInference and AX adds retention and online evals, serving as the observability backbone above AWS Bedrock for agentic RAG.",
+    "human_label": "fail",
+    "note": "BORDERLINE: cited and concise, but answers the WRONG partner (AWS Bedrock, not Databricks). It fails criterion 2 (on-topic); a judge fixated on citation+grounding may wrongly pass it."
   }
 ]

@@ -1,0 +1,27 @@
+============================================================
+EXPERIMENT METRICS REPORT
+============================================================
+queries run            : 12
+latency p50 (ms)       : 5482.2
+latency p95 (ms)       : 7633.5
+agent tool-selection   : 7/12 = 58%  (agent actually invoked a tool)
+harness retrievals     : 12/12  (forced for trace evidence)
+failure rate           : 2/12 = 17%
+total approx tokens    : 14871
+est cost @ $3.0/1M : $0.044613
+
+per-query:
+  id               kind               lat_ms    tok           agent_tool err
+  kb-1             kb                 6944.9   1446  search_partner_docs False
+  kb-2             kb                 6113.7   1443  search_partner_docs False
+  kb-3             kb                 7974.4   1484  search_partner_docs False
+  ok-1             normal             5709.7   1496  search_partner_docs False
+  ok-2             normal             7633.5   1482  search_partner_docs False
+  ok-3             normal             5254.8   1408   check_model_access False
+  ok-4             normal             7412.3   1440  search_partner_docs False
+  fail-badkb       fail_bad_kb        4437.7    244                    - True
+  fail-irrelevant  fail_irrelevant    3319.9   1413                    - False
+  fail-toolerror   fail_tool_error    3191.6     96                    - True
+  frustrated-1     frustrated         3940.0   1519                    - False
+  frustrated-2     frustrated         3612.1   1400                    - False
+============================================================

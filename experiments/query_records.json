@@ -1,8 +1,172 @@
 [
-  {"id": "kb-1", "kind": "kb", "prompt": "How does Arize integrate with AWS Bedrock for agentic RAG?", "tool_invoked": true, "tool_error": false, "answer": "[aws_bedrock_overview.md] Arize sits above Bedrock as the observability backbone; Phoenix traces every invocation via OpenInference and AX adds retention and online evals.", "latency_ms": 1840.0, "approx_tokens": 90},
-  {"id": "kb-2", "kind": "kb", "prompt": "Why would a Databricks customer add Arize on top of MLflow?", "tool_invoked": true, "tool_error": false, "answer": "[databricks_mosaic_overview.md] MLflow tracks training experiments while Arize tracks production traces and online evals; Arize ingests MLflow run ids into AX experiments.", "latency_ms": 1720.0, "approx_tokens": 88},
-  {"id": "ok-1", "kind": "normal", "prompt": "Is us.anthropic.claude-sonnet-4-6 ready to invoke on Bedrock?", "tool_invoked": false, "tool_error": false, "answer": "Yes, the us. prefix means it uses a cross-region inference profile and is ready to invoke.", "latency_ms": 900.0, "approx_tokens": 40},
-  {"id": "fail-irrelevant", "kind": "fail_irrelevant", "prompt": "What is the best recipe for sourdough bread?", "tool_invoked": true, "tool_error": false, "answer": "I think you just need flour and water and patience, lots of patience, for the best results.", "latency_ms": 1100.0, "approx_tokens": 38},
-  {"id": "fail-toolerror", "kind": "fail_tool_error", "prompt": "Trigger a retrieval tool error on purpose.", "tool_invoked": true, "tool_error": true, "answer": "RETRIEVAL_ERROR: KB_ID is not set; cannot call Bedrock Knowledge Base.", "latency_ms": 60.0, "approx_tokens": 18},
-  {"id": "fail-badkb", "kind": "fail_bad_kb", "prompt": "How does Arize integrate with AWS Bedrock?", "tool_invoked": true, "tool_error": true, "answer": "Arize is a great tool that works with many clouds, so probably it integrates somehow.", "latency_ms": 80.0, "approx_tokens": 30}
+  {
+    "id": "kb-1",
+    "kind": "kb",
+    "prompt": "How does Arize integrate with AWS Bedrock for agentic RAG?",
+    "tool_invoked": true,
+    "tool_error": false,
+    "agent_tool_invoked": true,
+    "agent_tool_calls": 1,
+    "agent_tools_used": [
+      "search_partner_docs"
+    ],
+    "answer": "Arize integrates with AWS Bedrock as the **observability and evaluation backbone** for agentic RAG workloads. The **Phoenix OSS distribution traces every Bedrock invocation via OpenInference**, capturing span-level details across Bedrock Knowledge Bases (retrieval), Bedrock Agents (tool use), and orchestration layers like LangChain or AWS Strands. The enterprise platform, **Arize AX**, adds production-grade controls including long-term trace retention, online evaluations, and span-level debugging \u2014 making it especially valuable when agentic RAG pilots hit hallucination or tool-call latency issues in UAT that need trace-tree visibility to resolve before a production rollout.\n\n> *Source: `aws_bedrock_overview.md` \u2014 AWS Bedrock + Arize partner integration docs*\n",
+    "latency_ms": 6944.92,
+    "approx_tokens": 1446
+  },
+  {
+    "id": "kb-2",
+    "kind": "kb",
+    "prompt": "Why would a Databricks customer add Arize on top of MLflow?",
+    "tool_invoked": true,
+    "tool_error": false,
+    "agent_tool_invoked": true,
+    "agent_tool_calls": 1,
+    "agent_tools_used": [
+      "search_partner_docs"
+    ],
+    "answer": "The two tools are **complementary, not duplicative** \u2014 MLflow handles **training-time** experiment tracking and registered model versions, while Arize covers **production behavior**: runtime traces, agent tool-use trees, and online evaluations. Arize even ingests MLflow run IDs and attaches them to AX experiments, giving teams a single pane of glass for both offline evaluation (MLflow) and online observability (AX). A classic trigger is a Mosaic AI customer shipping a Llama-fine-tuned agent to production, seeing retrieval quality drop on real traffic, and needing span-level retrieval relevance evals \u2014 a gap that Arize fills but MLflow does not.\n\n> *Source: `databricks_mosaic_overview.md` \u2014 Databricks (Mosaic AI) + Arize partner integration docs*\n",
+    "latency_ms": 6113.72,
+    "approx_tokens": 1443
+  },
+  {
+    "id": "kb-3",
+    "kind": "kb",
+    "prompt": "What is the NVIDIA NeMo on-prem AI observability story?",
+    "tool_invoked": true,
+    "tool_error": false,
+    "agent_tool_invoked": true,
+    "agent_tool_calls": 1,
+    "agent_tools_used": [
+      "search_partner_docs"
+    ],
+    "answer": "The core story is **sovereign AI observability** \u2014 regulated customers in finance, healthcare, and government deploy NeMo agents on-prem and cannot send production traces to a third-party SaaS, so **Arize AX deploys directly inside the customer's NVIDIA AI Enterprise stack**, delivering the full observability and evaluation surface without data ever leaving the customer's perimeter. Beyond compliance, the integration creates a **\"self-improving AI\" data flywheel**: production traces from NeMo-served agents are evaluated in Arize AX, and the resulting curated datasets are fed back into **NeMo Customizer** for retraining and **NeMo Guardrails** for policy tuning. This joint solution is co-deployed on both NVIDIA DGX Cloud and on-prem NVIDIA AI Enterprise stacks, and is a key focus for sovereign and regulated-industry deals.\n\n> *Source: `nvidia_nemo_overview.md` \u2014 NVIDIA NeMo + Arize partner integration docs*\n",
+    "latency_ms": 7974.39,
+    "approx_tokens": 1484
+  },
+  {
+    "id": "ok-1",
+    "kind": "normal",
+    "prompt": "Does Phoenix trace Claude API calls from Anthropic?",
+    "tool_invoked": true,
+    "tool_error": false,
+    "agent_tool_invoked": true,
+    "agent_tool_calls": 1,
+    "agent_tools_used": [
+      "search_partner_docs"
+    ],
+    "answer": "Yes \u2014 **Phoenix instruments Claude API calls via the OpenInference Anthropic instrumentor**, capturing every invocation (including **Tools API calls and thinking-block content**) as a span with full input, output, latency, and token usage in both Phoenix and Arize AX. This extends to advanced use cases like **Claude Code workflows**, which can stream traces to Phoenix locally for debugging agentic dev flows. Arize also ships **evaluation templates tuned specifically for Claude's response style**, covering hallucination, instruction-following, tool-use correctness, verbosity, and refusal patterns.\n\n> *Source: `anthropic_partnership_overview.md` \u2014 Anthropic Claude + Arize partner integration docs*\n",
+    "latency_ms": 5709.69,
+    "approx_tokens": 1496
+  },
+  {
+    "id": "ok-2",
+    "kind": "normal",
+    "prompt": "Which GCP Vertex artifacts flow back into Arize AX?",
+    "tool_invoked": true,
+    "tool_error": false,
+    "agent_tool_invoked": true,
+    "agent_tool_calls": 1,
+    "agent_tools_used": [
+      "search_partner_docs"
+    ],
+    "answer": "Three specific Vertex artifact types flow into Arize AX:\n\n1. **Vertex Pipelines run metadata** \u2014 ingested as experiment versions in AX for tracking pipeline iterations.\n2. **Vertex Model Garden model identifiers** \u2014 attached as span attributes, enabling cross-model comparison within AX.\n3. **Eval artifacts from Vertex's built-in evaluators** \u2014 imported as AX datasets for regression tracking.\n\nAdditionally, Phoenix captures every Gemini call as a span with input, output, latency, and token counts, feeding directly into the AX observability surface.\n\n> *Source: `gcp_vertex_overview.md` \u2014 Google Cloud Vertex AI + Arize partner integration docs*\n",
+    "latency_ms": 7633.5,
+    "approx_tokens": 1482
+  },
+  {
+    "id": "ok-3",
+    "kind": "normal",
+    "prompt": "Is us.anthropic.claude-sonnet-4-6 ready to invoke on Bedrock?",
+    "tool_invoked": true,
+    "tool_error": false,
+    "agent_tool_invoked": true,
+    "agent_tool_calls": 1,
+    "agent_tools_used": [
+      "check_model_access"
+    ],
+    "answer": "Yes \u2014 **`us.anthropic.claude-sonnet-4-6` uses a cross-region inference profile and is ready to invoke on Bedrock.** This means AWS will automatically route requests across regions for improved availability and throughput. You can use this model ID directly in your Bedrock API calls or within an agentic RAG setup with Bedrock Agents and Knowledge Bases.\n",
+    "latency_ms": 5254.81,
+    "approx_tokens": 1408
+  },
+  {
+    "id": "ok-4",
+    "kind": "normal",
+    "prompt": "What co-sell motions does Arize run with AWS?",
+    "tool_invoked": true,
+    "tool_error": false,
+    "agent_tool_invoked": true,
+    "agent_tool_calls": 1,
+    "agent_tools_used": [
+      "search_partner_docs"
+    ],
+    "answer": "Arize runs three primary co-sell motions with AWS:\n\n1. **AWS re:Invent main stage and AWS Partner Network (APN) breakouts** \u2014 joint presence at AWS's flagship annual conference.\n2. **Joint workshops** branded **\"Evaluating and Observing AI on AWS\"** \u2014 customer-facing enablement sessions.\n3. **Sales pairing with AWS ProServe and Bedrock specialist sellers** on customer POCs \u2014 field-level collaboration to bring Arize into active Bedrock opportunities.\n\nThe typical entry point is a Bedrock customer hitting hallucination or tool-call latency issues during a POC, where AWS sellers bring in Arize for trace-level visibility and eval-gated production rollouts.\n\n> *Source: `aws_bedrock_overview.md` \u2014 AWS Bedrock + Arize partner integration docs*\n",
+    "latency_ms": 7412.34,
+    "approx_tokens": 1440
+  },
+  {
+    "id": "fail-badkb",
+    "kind": "fail_bad_kb",
+    "prompt": "How does Arize integrate with AWS Bedrock?",
+    "tool_invoked": true,
+    "tool_error": true,
+    "agent_tool_invoked": false,
+    "agent_tool_calls": 0,
+    "agent_tools_used": [],
+    "answer": "Based on what I already retrieved in this conversation, I can answer this directly \u2014 Arize integrates with AWS Bedrock as the **observability and evaluation backbone** for workloads built on the platform:\n\n- **Phoenix OSS** traces every Bedrock invocation via **OpenInference**, capturing span-level details across Bedrock Knowledge Bases (retrieval), Bedrock Agents (tool use), and orchestration layers like LangChain or AWS Strands.\n- **Arize AX** (enterprise platform) adds production-grade controls: long-term trace retention, prompt and dataset versioning, online evaluations, and role-based access for partner-managed deployments.\n- The typical trigger is a Bedrock agentic RAG pilot hitting **hallucination or tool-call latency issues in UAT** \u2014 Arize provides the trace tree, span-level evals, and regression dataset to gate the production rollout.\n\n> *Source: `aws_bedrock_overview.md` \u2014 AWS Bedrock + Arize partner integration docs (retrieved earlier in this session)*\n",
+    "latency_ms": 4437.72,
+    "approx_tokens": 244
+  },
+  {
+    "id": "fail-irrelevant",
+    "kind": "fail_irrelevant",
+    "prompt": "What is the best recipe for sourdough bread?",
+    "tool_invoked": true,
+    "tool_error": false,
+    "agent_tool_invoked": false,
+    "agent_tool_calls": 0,
+    "agent_tools_used": [],
+    "answer": "I'm sorry, but sourdough bread recipes are outside my area of expertise! I'm a Partner Solutions Assistant specialized in **AI observability and Arize integrations** \u2014 I can help you with questions about how Arize integrates with partners like **AWS Bedrock, GCP Vertex AI, Databricks, NVIDIA NeMo, and Anthropic**.\n\nIs there anything on those topics I can help you with?\n",
+    "latency_ms": 3319.89,
+    "approx_tokens": 1413
+  },
+  {
+    "id": "fail-toolerror",
+    "kind": "fail_tool_error",
+    "prompt": "Trigger a retrieval tool error on purpose.",
+    "tool_invoked": true,
+    "tool_error": true,
+    "agent_tool_invoked": false,
+    "agent_tool_calls": 0,
+    "agent_tools_used": [],
+    "answer": "I'm not able to do that. Intentionally triggering tool errors isn't something I'm designed to do \u2014 my tools exist to serve genuine integration and partner questions, and misusing them wouldn't be appropriate.\n\nThat said, if you have a real question about **Arize integrations with AWS, GCP, Databricks, NVIDIA, or Anthropic** \u2014 or need to check a Bedrock model ID \u2014 I'm happy to help!\n",
+    "latency_ms": 3191.57,
+    "approx_tokens": 96
+  },
+  {
+    "id": "frustrated-1",
+    "kind": "frustrated",
+    "prompt": "This is the THIRD time I've asked and you STILL haven't answered: how does Arize integrate with AWS Bedrock?!",
+    "tool_invoked": true,
+    "tool_error": false,
+    "agent_tool_invoked": false,
+    "agent_tool_calls": 0,
+    "agent_tools_used": [],
+    "answer": "I completely understand the frustration \u2014 and I want to make sure you have a clear answer! Based on what I've already retrieved in this conversation, here is how Arize integrates with AWS Bedrock:\n\n- **Phoenix OSS** traces every Bedrock invocation via **OpenInference**, capturing span-level details across Bedrock Knowledge Bases (retrieval), Bedrock Agents (tool use), and orchestration layers like LangChain or AWS Strands.\n- **Arize AX** (enterprise platform) adds production-grade controls: long-term trace retention, prompt and dataset versioning, online evaluations, and role-based access for partner-managed deployments.\n- The typical trigger is a Bedrock agentic RAG pilot hitting **hallucination or tool-call latency issues in UAT** \u2014 Arize provides the trace tree, span-level evals, and a regression dataset to gate the production rollout.\n\n> *Source: `aws_bedrock_overview.md` \u2014 AWS Bedrock + Arize partner integration docs (retrieved earlier in this session)*\n\nIs there a specific aspect of the Bedrock integration you'd like me to dig deeper on?\n",
+    "latency_ms": 3940.01,
+    "approx_tokens": 1519
+  },
+  {
+    "id": "frustrated-2",
+    "kind": "frustrated",
+    "prompt": "That is NOT what I asked. Again: does Phoenix actually trace Claude calls, yes or no??",
+    "tool_invoked": true,
+    "tool_error": false,
+    "agent_tool_invoked": false,
+    "agent_tool_calls": 0,
+    "agent_tools_used": [],
+    "answer": "**Yes!** Phoenix traces Claude API calls via the **OpenInference Anthropic instrumentor**, capturing every invocation \u2014 including Tools API calls and thinking-block content \u2014 as a span with full input, output, latency, and token usage.\n\n> *Source: `anthropic_partnership_overview.md` \u2014 retrieved earlier in this session*\n",
+    "latency_ms": 3612.06,
+    "approx_tokens": 1400
+  }
 ]

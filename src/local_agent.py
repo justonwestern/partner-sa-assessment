@@ -25,7 +25,7 @@ Run against a real Bedrock KB:
 
 # Import instrumentation FIRST so the global TracerProvider is registered
 # before the Strands Agent is constructed.
-from src.instrumentation import init_tracing, record_retrieval_span
+from src.instrumentation import init_tracing, record_retrieval_span, get_tracer
 
 from strands import Agent
 from strands.models.bedrock import BedrockModel
@@ -74,12 +74,17 @@ def ask(agent: Agent, prompt: str) -> str:
     wrapper; we keep it here so the candidate can read the whole flow top-down.
     """
     lower = prompt.lower()
-    if any(h in lower for h in _PARTNER_HINTS):
-        result = retrieve_partner_docs(prompt)
-        record_retrieval_span(prompt, result)
+    # Wrap the whole turn in ONE span so the manual RETRIEVER span and the
+    # agent's own LLM/tool spans land in a single trace tree. Previously the
+    # retrieval span was emitted with no active span, so it became its own
+    # separate root trace instead of nesting with the agent turn.
+    with get_tracer().start_as_current_span("agent_turn"):
+        if any(h in lower for h in _PARTNER_HINTS):
+            result = retrieve_partner_docs(prompt)
+            record_retrieval_span(prompt, result)
 
-    result = agent(prompt)
-    return str(result)
+        result = agent(prompt)
+        return str(result)
 
 
 def main() -> None:
