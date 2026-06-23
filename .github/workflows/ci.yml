@@ -1,0 +1,40 @@
+name: CI
+
+# Validates the dependency-light, network-free core of the pipeline on every
+# push and PR: the unit tests plus the two offline eval entrypoints. The full
+# agent run (Strands + Bedrock + Phoenix) needs live AWS + a Phoenix server and
+# is exercised manually (see "Verification status" in the README); CI is scoped
+# to what can run deterministically in a hosted runner so the badge stays green.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: unit tests + offline eval smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test deps
+        # The eval layer imports only stdlib (OpenAI is imported lazily), so the
+        # tests need nothing beyond pytest.
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Run unit tests
+        run: python -m pytest -q
+
+      - name: Offline groundedness evaluator self-test
+        run: python -m src.evaluators.code_evaluator
+
+      - name: Offline LLM-judge validation (deterministic stub)
+        run: python -m src.evaluators.llm_judge --offline

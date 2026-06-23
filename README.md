@@ -1,5 +1,7 @@
 # Partner SA Assessment: a Strands + Bedrock agent, observed in local Phoenix
 
+[![CI](https://github.com/justonwestern/partner-sa-assessment/actions/workflows/ci.yml/badge.svg)](https://github.com/justonwestern/partner-sa-assessment/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A runnable "better-together" reference build for the Arize Partner Solutions
 Architect assessment. A **Strands** agent on **Amazon Bedrock** (Claude Sonnet)
 retrieves through a real **Bedrock Knowledge Base**, emits **OpenInference**
@@ -85,7 +87,7 @@ hop. Run `python docs/architecture.py` to regenerate it.
 ## Layout
 
 ```
-strands-agentcore-arize-cookbook/
+partner-sa-assessment/
   src/
     instrumentation.py     # OTel -> OpenInference -> LOCAL PHOENIX (AX behind a flag)
                            #   + record_retrieval_span(): the manual RETRIEVER span
@@ -108,10 +110,14 @@ strands-agentcore-arize-cookbook/
   experiments/             # metrics_report.txt, query_records.json, feedback_report.md,
                            #   spans_sample.md (committed); spans.parquet/csv (gitignored)
   notebooks/               # better_together_cookbook.ipynb (narrative walkthrough)
+  tests/                   # pytest: groundedness eval + judge-vs-human math
+  .github/workflows/ci.yml # CI: unit tests + offline eval smoke (green badge)
+  ALYX_HANDS_ON.md         # Alyx (Arize AX copilot) hands-on walkthrough
   DESIGN_MEMO.md           # Step 7: partner choice + production-readiness plan
   Dockerfile               # optional container image (TRACK A); offline smoke test by default
   requirements.txt         # laptop-side deps (pinned)
   .env.example
+  LICENSE                  # MIT
 ```
 
 ---
@@ -119,7 +125,6 @@ strands-agentcore-arize-cookbook/
 ## Setup
 
 ```bash
-cd strands-agentcore-arize-cookbook
 python3 -m venv .venv && source .venv/bin/activate     # Python 3.10-3.12
 pip install -r requirements.txt
 cp .env.example .env
@@ -312,6 +317,20 @@ Two findings from the live run, both visible in the traces:
 
 ---
 
+## Tests
+
+Unit tests cover the code-based groundedness evaluator and the judge-vs-human
+agreement math (Cohen's kappa, precision/recall/F1) plus the deterministic
+offline stub judge. They use only stdlib (no network, no API key, no AWS) and
+run on every push via the CI workflow above.
+
+```bash
+pip install pytest
+pytest -q
+```
+
+---
+
 ## Verification status
 
 Everything in the core deliverable (TRACK A) was run against a live AWS account
@@ -325,7 +344,7 @@ which is a separate deployment surface, not a missing piece of the pipeline.
 | Manual OpenInference RETRIEVER span (doc ids/scores/kb_id/tokens/latency) | Verified; renders as a RETRIEVER span nested under the agent turn in Phoenix |
 | Three evals + LLM judge + judge-vs-human validation | Verified with OpenAI gpt-4o-mini (acc 0.93, F1 0.94, kappa 0.86 over 15 items) |
 | Eval labels attached to spans + `frustrated-interactions` dataset | Verified in the Phoenix UI |
-| Groundedness code evaluator | Real, unit-tested |
+| Groundedness code evaluator | Real, unit-tested (`tests/test_evaluators.py`, run in CI) |
 | Feedback loop (detect -> flag -> patch stub) | Verified against live Phoenix traces |
 | Phoenix span export in harness/feedback (`phoenix.client`) | Verified with `phoenix serve` running |
 | Architecture diagram | Real, PNG rendered (`docs/architecture.png`) |
